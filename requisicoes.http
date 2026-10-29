@@ -1,0 +1,177 @@
+@base = http://localhost:8080
+
+# --- SETORES ---
+
+POST {{base}}/setores
+Content-Type: application/json
+
+{ "nome": "Coordenação de Laboratórios", "sigla": "LABS" }
+
+###
+GET {{base}}/setores?nome=coord&page=0&size=10&sort=nome,asc
+
+###
+GET {{base}}/setores/1
+
+###
+PUT {{base}}/setores/3
+Content-Type: application/json
+
+{ "nome": "Coordenação de Laboratórios de Informática", "sigla": "LABS" }
+
+###
+DELETE {{base}}/setores/3
+
+###
+GET {{base}}/setores/1/categorias
+
+
+### --- CATEGORIAS ---
+
+POST {{base}}/categorias
+Content-Type: application/json
+
+{ "nome": "Hardware", "descricao": "Problemas em gabinetes e peças", "setorId": 1 }
+
+###
+GET {{base}}/categorias?setorId=1&nome=red
+
+###
+GET {{base}}/categorias/1
+
+###
+PUT {{base}}/categorias/5
+Content-Type: application/json
+
+{ "nome": "Hardware e Periféricos", "descricao": "Computadores, teclados, mouses", "setorId": 1 }
+
+###
+DELETE {{base}}/categorias/5
+
+
+### --- USUÁRIOS ---
+
+POST {{base}}/usuarios
+Content-Type: application/json
+
+{ "nome": "Eduardo Técnico", "email": "eduardo.tec@ifrn.edu.br", "matricula": "2026203", "tipo": "TECNICO", "setorId": 1 }
+
+###
+GET {{base}}/usuarios?tipo=TECNICO&setorId=1&nome=jo
+
+###
+GET {{base}}/usuarios/1
+
+###
+PUT {{base}}/usuarios/5
+Content-Type: application/json
+
+{ "nome": "Eduardo Silva Técnico", "email": "eduardo.tec@ifrn.edu.br", "matricula": "2026203", "tipo": "TECNICO", "setorId": 1 }
+
+### Deve dar 409 (e-mail já cadastrado)
+POST {{base}}/usuarios
+Content-Type: application/json
+
+{ "nome": "Outra Ana", "email": "ana@ifrn.edu.br", "matricula": "999", "tipo": "SOLICITANTE" }
+
+
+### --- CHAMADOS ---
+
+# 1. Abr\e chamado no COTIC
+POST {{base}}/chamados
+Content-Type: application/json
+
+{ "titulo": "Wi-Fi do laboratório caiu", "descricao": "Sem sinal de internet no laboratório 2.", "local": "Laboratório 02", "prioridade": "ALTA", "solicitanteId": 1, "categoriaId": 1 }
+
+### 2. Abre outro no CMINF (sem mandar prioridade, tem que assumir MEDIA)
+POST {{base}}/chamados
+Content-Type: application/json
+
+{ "titulo": "Projetor não liga", "descricao": "O projetor da sala 5 não dá imagem.", "local": "Sala 05", "solicitanteId": 2, "categoriaId": 3 }
+
+###
+GET {{base}}/chamados?status=ABERTO&setorId=1&prioridade=ALTA&dataInicio=2026-10-01&dataFim=2026-12-31&page=0&size=10&sort=dataAbertura,desc
+
+###
+GET {{base}}/chamados/1
+
+###
+GET {{base}}/usuarios/1/chamados?status=ABERTO
+
+###
+GET {{base}}/usuarios/3/chamados
+
+### Teste erro: técnico de outro setor (Maria - CMINF) tentando assumir chamado do COTIC -> 409
+PATCH {{base}}/chamados/1/assumir
+Content-Type: application/json
+
+{ "tecnicoId": 4 }
+
+### Técnico do setor certo (João - COTIC) assume -> 200
+PATCH {{base}}/chamados/1/assumir
+Content-Type: application/json
+
+{ "tecnicoId": 3 }
+
+###
+POST {{base}}/chamados/1/interacoes
+Content-Type: application/json
+
+{ "autorId": 1, "texto": "Já tentei reiniciar o roteador." }
+
+###
+POST {{base}}/chamados/1/interacoes
+Content-Type: application/json
+
+{ "autorId": 3, "texto": "Vou verificar o switch amanhã." }
+
+### Teste erro: usuário que não tem nada a ver com o chamado tenta interagir -> 409
+POST {{base}}/chamados/1/interacoes
+Content-Type: application/json
+
+{ "autorId": 2, "texto": "Posso opinar?" }
+
+### Teste erro: tentar resolver sem mandar a solução -> 400
+PATCH {{base}}/chamados/1/resolver
+Content-Type: application/json
+
+{ "tecnicoId": 3, "solucao": "" }
+
+### Técnico resolve com sucesso -> 200
+PATCH {{base}}/chamados/1/resolver
+Content-Type: application/json
+
+{ "tecnicoId": 3, "solucao": "Substituído o cabo de rede do switch." }
+
+### Teste erro: tentar mandar mensagem em chamado já resolvido -> 409
+POST {{base}}/chamados/1/interacoes
+Content-Type: application/json
+
+{ "autorId": 1, "texto": "Obrigada!" }
+
+### Teste erro: outro usuário tentando cancelar o chamado 2 -> 409
+PATCH {{base}}/chamados/2/cancelar
+Content-Type: application/json
+
+{ "solicitanteId": 1 }
+
+### Dono cancela o chamado 2 certinho -> 200
+PATCH {{base}}/chamados/2/cancelar
+Content-Type: application/json
+
+{ "solicitanteId": 2 }
+
+
+### --- TESTES DE ERRO / LIMITES ---
+
+### 404 - Chamado que não existe
+GET {{base}}/chamados/9999
+
+### 400 - Filtro de status maluco
+GET {{base}}/chamados?status=XPTO
+
+### Trava de paginação max 50 (passando 500, deve vir capped em 50)
+GET {{base}}/chamados?size=500
+
+### 409 - Tentar deletar setor que tem categoria/chamado
+DELETE {{base}}/setores/1
